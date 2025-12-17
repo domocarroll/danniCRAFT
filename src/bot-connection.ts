@@ -13,6 +13,7 @@ interface BotConfig {
   username: string;
   auth: 'microsoft' | 'offline';
   version?: string;
+  realm?: string;
 }
 
 interface ConnectionCallbacks {
@@ -65,10 +66,50 @@ export class BotConnection {
       botOptions.version = this.config.version;
     }
 
-    this.callbacks.onLog('info', `Connecting to ${this.config.host}:${this.config.port} with ${this.config.auth} auth...`);
+    // Handle Realm connection
+    if (this.config.realm) {
+      if (this.config.auth !== 'microsoft') {
+        this.callbacks.onLog('error', 'Realm connection requires --auth microsoft');
+        return;
+      }
 
-    if (this.config.auth === 'microsoft') {
-      this.callbacks.onLog('info', 'Microsoft auth enabled. You may need to complete login in your browser on first run.');
+      const realmName = this.config.realm.toLowerCase();
+      this.callbacks.onLog('info', `Looking for Realm matching "${this.config.realm}"...`);
+
+      // Use mineflayer's built-in Realm support with pickRealm callback
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      botOptions.realms = {
+        pickRealm: (realms: any[]) => {
+          this.callbacks.onLog('info', `Found ${realms.length} Realm(s) on your account:`);
+
+          realms.forEach((r: any, i: number) => {
+            this.callbacks.onLog('info', `  ${i + 1}. ${r.name}`);
+          });
+
+          // Find realm by partial name match (case-insensitive)
+          const matchedRealm = realms.find((r: any) =>
+            r.name.toLowerCase().includes(realmName)
+          );
+
+          if (matchedRealm) {
+            this.callbacks.onLog('info', `Connecting to Realm: ${matchedRealm.name}`);
+            return matchedRealm;
+          } else {
+            this.callbacks.onLog('error', `No Realm found matching "${this.config.realm}"`);
+            this.callbacks.onLog('info', 'Available Realms: ' + realms.map((r: any) => r.name).join(', '));
+            // Return first realm as fallback or throw
+            throw new Error(`Realm "${this.config.realm}" not found`);
+          }
+        }
+      };
+
+      this.callbacks.onLog('info', 'Microsoft auth enabled for Realm connection. Browser login may be required on first run.');
+    } else {
+      this.callbacks.onLog('info', `Connecting to ${this.config.host}:${this.config.port} with ${this.config.auth} auth...`);
+
+      if (this.config.auth === 'microsoft') {
+        this.callbacks.onLog('info', 'Microsoft auth enabled. You may need to complete login in your browser on first run.');
+      }
     }
 
     this.bot = mineflayer.createBot(botOptions);
@@ -89,7 +130,7 @@ export class BotConnection {
 
       // danniCRAFT personality on spawn
       bot.chat("I sense something intriguing about this world... danniCRAFT, ready to assist.");
-      this.callbacks.onLog('info', `danniCRAFT connected successfully. Username: ${bot.username}, Server: ${this.config.host}:${this.config.port}`);
+      this.callbacks.onLog('info', `danniCRAFT connected successfully. Username: ${bot.username}, Server: ${this.config.realm || this.config.host}`);
     });
 
     bot.on('chat', (username, message) => {
@@ -184,12 +225,12 @@ export class BotConnection {
       }
 
       const errorMessage =
-        `Cannot connect to Minecraft server at ${this.config.host}:${this.config.port}\n\n` +
+        `Cannot connect to Minecraft server.\n\n` +
         `Please ensure:\n` +
-        `1. Minecraft server is running on ${this.config.host}:${this.config.port}\n` +
-        `2. Server is accessible from this machine\n` +
-        `3. Server version is compatible (tested with: ${SUPPORTED_MINECRAFT_VERSION})\n` +
-        `4. For Realms: Use --auth microsoft and complete browser login\n\n` +
+        `1. Minecraft server/Realm is accessible\n` +
+        `2. Server version is compatible (tested with: ${SUPPORTED_MINECRAFT_VERSION})\n` +
+        `3. For Realms: Use --auth microsoft --realm "RealmName"\n` +
+        `4. Complete browser login if prompted\n\n` +
         `For setup instructions, visit: https://github.com/domocarroll/danniCRAFT`;
 
       return { connected: false, message: errorMessage };
