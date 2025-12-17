@@ -1,10 +1,12 @@
 {
-  "name": "minecraft-mcp-server",
+  "name": "dannicraft",
   "version": "1.0.0",
+  "description": "danniCRAFT - An AI companion for Minecraft, powered by Claude. Fork of minecraft-mcp-server with fishing, realm support, and personality.",
+  "author": "domocarroll",
   "type": "module",
   "main": "dist/main.js",
   "bin": {
-    "minecraft-mcp-server": "dist/main.js"
+    "dannicraft": "dist/main.js"
   },
   "ava": {
     "extensions": [

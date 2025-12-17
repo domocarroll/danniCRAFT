@@ -3,7 +3,7 @@ import pathfinderPkg from 'mineflayer-pathfinder';
 const { pathfinder, Movements } = pathfinderPkg;
 import minecraftData from 'minecraft-data';
 
-const SUPPORTED_MINECRAFT_VERSION = '1.21.8';
+const SUPPORTED_MINECRAFT_VERSION = '1.21.4';
 
 type ConnectionState = 'connected' | 'connecting' | 'disconnected';
 
@@ -11,6 +11,8 @@ interface BotConfig {
   host: string;
   port: number;
   username: string;
+  auth: 'microsoft' | 'offline';
+  version?: string;
 }
 
 interface ConnectionCallbacks {
@@ -50,12 +52,24 @@ export class BotConnection {
   }
 
   connect(): void {
-    const botOptions = {
+    const botOptions: mineflayer.BotOptions = {
       host: this.config.host,
       port: this.config.port,
       username: this.config.username,
+      auth: this.config.auth,
       plugins: { pathfinder },
     };
+
+    // Add version if specified
+    if (this.config.version) {
+      botOptions.version = this.config.version;
+    }
+
+    this.callbacks.onLog('info', `Connecting to ${this.config.host}:${this.config.port} with ${this.config.auth} auth...`);
+
+    if (this.config.auth === 'microsoft') {
+      this.callbacks.onLog('info', 'Microsoft auth enabled. You may need to complete login in your browser on first run.');
+    }
 
     this.bot = mineflayer.createBot(botOptions);
     this.state = 'connecting';
@@ -73,8 +87,9 @@ export class BotConnection {
       const defaultMove = new Movements(bot, mcData);
       bot.pathfinder.setMovements(defaultMove);
 
-      bot.chat('LLM-powered bot ready to receive instructions!');
-      this.callbacks.onLog('info', `Bot connected successfully. Username: ${this.config.username}, Server: ${this.config.host}:${this.config.port}`);
+      // danniCRAFT personality on spawn
+      bot.chat("I sense something intriguing about this world... danniCRAFT, ready to assist.");
+      this.callbacks.onLog('info', `danniCRAFT connected successfully. Username: ${bot.username}, Server: ${this.config.host}:${this.config.port}`);
     });
 
     bot.on('chat', (username, message) => {
@@ -173,14 +188,15 @@ export class BotConnection {
         `Please ensure:\n` +
         `1. Minecraft server is running on ${this.config.host}:${this.config.port}\n` +
         `2. Server is accessible from this machine\n` +
-        `3. Server version is compatible (latest supported: ${SUPPORTED_MINECRAFT_VERSION})\n\n` +
-        `For setup instructions, visit: https://github.com/yuniko-software/minecraft-mcp-server`;
+        `3. Server version is compatible (tested with: ${SUPPORTED_MINECRAFT_VERSION})\n` +
+        `4. For Realms: Use --auth microsoft and complete browser login\n\n` +
+        `For setup instructions, visit: https://github.com/domocarroll/danniCRAFT`;
 
       return { connected: false, message: errorMessage };
     }
 
     if (currentState === 'connecting') {
-      return { connected: false, message: 'Bot is connecting to the Minecraft server. Please wait a moment and try again.' };
+      return { connected: false, message: 'danniCRAFT is connecting to the Minecraft server. Please wait a moment and try again.' };
     }
 
     return { connected: true };
@@ -192,7 +208,7 @@ export class BotConnection {
     }
     if (this.bot) {
       try {
-        this.bot.quit('Server shutting down');
+        this.bot.quit('danniCRAFT signing off...');
       } catch (err) {
         this.callbacks.onLog('warn', `Error during cleanup: ${this.formatError(err)}`);
       }
